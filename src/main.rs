@@ -124,6 +124,15 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                         args.get(0)?.eval(scope)?.get_array().len() as f64
                     ))
                 },
+                "range" => |args, scope| {
+                    Some(Type::Array(
+                        (args.get(0)?.eval(scope)?.get_number() as usize
+                            ..args.get(1)?.eval(scope)?.get_number() as usize)
+                            .step_by(args.get(2)?.eval(scope)?.get_number() as usize)
+                            .map(|x| Expr::Value(Type::Number(x as f64)))
+                            .collect(),
+                    ))
+                },
                 "if" => |args, scope| {
                     if args.get(0)?.eval(scope)?.get_bool() {
                         args.get(1)?.eval(scope)

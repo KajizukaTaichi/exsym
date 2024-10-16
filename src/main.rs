@@ -91,6 +91,11 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                         })?
                         .eval(scope)
                 },
+                "count" => |args, scope| {
+                    Some(Type::Number(
+                        args.get(0)?.eval(scope)?.get_array().len() as f64
+                    ))
+                },
                 "if" => |args, scope| {
                     if args.get(0)?.eval(scope)?.get_bool() {
                         args.get(1)?.eval(scope)
@@ -423,6 +428,10 @@ impl Type {
     fn get_array(&self) -> Vec<Expr> {
         match self {
             Type::Array(s) => s.to_owned(),
+            Type::String(s) => s
+                .chars()
+                .map(|x| Expr::Value(Type::String(x.to_string())))
+                .collect(),
             other => vec![Expr::Value(other.to_owned())],
         }
     }

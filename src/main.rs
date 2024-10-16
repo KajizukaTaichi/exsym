@@ -5,13 +5,27 @@ const VERSION: &str = "0.1.0";
 
 fn main() {
     println!("Exsym {VERSION}");
-    let mut scope = HashMap::new();
+    let mut scope: HashMap<String, Expr> = HashMap::new();
 
     let mut rl = DefaultEditor::new().unwrap();
     loop {
         if let Ok(code) = rl.readline("> ") {
             if code.trim() == ":q" {
                 break;
+            }
+
+            if code.trim() == ":m" {
+                if scope.len() == 0 {
+                    println!("Symbols {{ }}");
+                } else {
+                    println!("Symbols {{");
+                    let width = scope.keys().map(|s| s.len()).max().unwrap_or(0);
+                    for (name, value) in scope.clone() {
+                        println!(" {:>width$}: {:?}", name, value,);
+                    }
+                    println!("}}");
+                }
+                continue;
             }
 
             rl.add_history_entry(&code).unwrap_or_default();

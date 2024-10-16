@@ -197,7 +197,7 @@ fn parse_expr(soruce: String) -> Option<Expr> {
             "*" => Operator::Mul,
             "/" => Operator::Div,
             "%" => Operator::Mod,
-            "=" => Operator::Equal,
+            "==" => Operator::Equal,
             "<" => Operator::LessThan,
             ">" => Operator::GreaterThan,
             "++" => Operator::Concat,

@@ -387,7 +387,8 @@ impl Type {
 
     fn display(&self, scope: &mut HashMap<String, Expr>) -> String {
         match self {
-            Type::String(s) | Type::Symbol(s) => format!("\"{}\"", s),
+            Type::String(s) => format!("\"{}\"", s),
+            Type::Symbol(s)  => s.to_string(),
             Type::Number(n) => n.to_string(),
             Type::Bool(b) => b.to_string(),
             Type::Array(a) => format!(

@@ -10,11 +10,10 @@ fn main() {
     let mut rl = DefaultEditor::new().unwrap();
     loop {
         if let Ok(code) = rl.readline("> ") {
-            if code.trim() == ":q" {
+            let code = code.trim().to_string();
+            if code == ":q" {
                 break;
-            }
-
-            if code.trim() == ":m" {
+            } else if code == ":m" {
                 if scope.len() == 0 {
                     println!("Symbols {{ }}");
                 } else {
@@ -25,12 +24,11 @@ fn main() {
                     }
                     println!("}}");
                 }
-                continue;
-            }
-
-            rl.add_history_entry(&code).unwrap_or_default();
-            if let Some(ast) = run_program(code, &mut scope) {
-                println!("{}", ast.display(&mut scope));
+            } else if !code.is_empty() {
+                rl.add_history_entry(&code).unwrap_or_default();
+                if let Some(ast) = run_program(code, &mut scope) {
+                    println!("{}", ast.display(&mut scope));
+                }
             }
         }
     }

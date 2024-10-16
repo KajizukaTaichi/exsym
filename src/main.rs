@@ -29,19 +29,35 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
     for line in source {
         if line.len() == 2 {
             let mut define = line[0].trim().to_string();
+            let mut is_recalc = true;
+            if define.trim().ends_with(':') {
+                define.remove(define.len() - 1);
+                define = define.trim().to_string();
+                is_recalc = false;
+            }
+
             if define.contains('[') && define.trim().ends_with(']') {
                 define.remove(define.len() - 1);
                 let (target, index) = define.split_once("[").unwrap();
 
                 let mut array = scope.clone().get(target)?.eval(scope)?.get_array();
+
                 array[parse_expr(index.to_string())?.eval(scope)?.get_number() as usize] =
-                    parse_expr(line[1].to_string())?;
+                    if is_recalc {
+                        parse_expr(line[1].to_string())?
+                    } else {
+                        Expr::Value(parse_expr(line[1].to_string())?.eval(scope)?)
+                    };
                 result = Type::Array(array);
                 scope.insert(target.to_string(), Expr::Value(result.clone()));
             } else {
                 result = parse_expr(line[1].clone())?.eval(scope)?;
+                if is_recalc {
+                    scope.insert(define, parse_expr(line[1].clone())?);
+                } else {
+                    scope.insert(define, Expr::Value(result.clone()));
+                }
             }
-            scope.insert(define, parse_expr(line[1].clone())?);
         } else {
             result = parse_expr(line[0].clone())?.eval(scope)?;
         }

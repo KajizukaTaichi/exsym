@@ -78,8 +78,8 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         let (func, args) = left.split_once("(").unwrap();
         Expr::Function(
             match func {
-                "sum" => |i, scope| {
-                    i.get(0)?
+                "sum" => |args, scope| {
+                    args.get(0)?
                         .eval(scope)?
                         .get_array()
                         .iter()
@@ -91,7 +91,25 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                         })?
                         .eval(scope)
                 },
-                _ => |i, scope| i.get(0)?.eval(scope),
+                "if" => |args, scope| {
+                    if args.get(0)?.eval(scope)?.get_bool() {
+                        args.get(1)?.eval(scope)
+                    } else {
+                        args.get(2)?.eval(scope)
+                    }
+                },
+                "lookup" => |args, scope| {
+                    let index = args.get(1)?.eval(scope)?.get_array().iter().position(|x| {
+                        x.eval(scope).unwrap().display(scope)
+                            == args.get(0).unwrap().eval(scope).unwrap().display(scope)
+                    })?;
+                    args.get(2)?
+                        .eval(scope)?
+                        .get_array()
+                        .get(index)?
+                        .eval(scope)
+                },
+                _ => |args, scope| args.get(0)?.eval(scope),
             },
             tokenize_args(args.to_string())?
                 .iter()
@@ -388,7 +406,7 @@ impl Type {
     fn display(&self, scope: &mut HashMap<String, Expr>) -> String {
         match self {
             Type::String(s) => format!("\"{}\"", s),
-            Type::Symbol(s)  => s.to_string(),
+            Type::Symbol(s) => s.to_string(),
             Type::Number(n) => n.to_string(),
             Type::Bool(b) => b.to_string(),
             Type::Array(a) => format!(

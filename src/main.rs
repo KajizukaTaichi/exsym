@@ -28,6 +28,7 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
 
     for line in source {
         if line.len() == 2 {
+            result = parse_expr(line[1].clone())?.eval(scope)?;
             scope.insert(line[0].trim().to_string(), parse_expr(line[1].clone())?);
         } else {
             result = parse_expr(line[0].clone())?.eval(scope)?;

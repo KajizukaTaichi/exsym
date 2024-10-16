@@ -97,6 +97,14 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                 .map(|x| parse_expr(x.to_owned()).unwrap())
                 .collect::<Vec<Expr>>(),
         )
+    } else if left.contains('[') && left.ends_with(']') {
+        let mut left = left.clone();
+        left.remove(left.len() - 1);
+        let (target, index) = left.split_once("[").unwrap();
+        Expr::Access(
+            Box::new(parse_expr(target.to_string())?),
+            Box::new(parse_expr(index.to_string())?),
+        )
     } else {
         Expr::Value(Type::Symbol(left))
     };
@@ -407,6 +415,7 @@ enum Expr {
         fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>,
         Vec<Expr>,
     ),
+    Access(Box<Expr>, Box<Expr>),
     Value(Type),
 }
 
@@ -426,6 +435,14 @@ impl Expr {
                 }
             }
             Expr::Function(func, args) => func(args.to_owned(), scope)?,
+            Expr::Access(target, index) => target
+                .eval(scope)?
+                .get_array()
+                .iter()
+                .map(|x| x.eval(scope).unwrap())
+                .collect::<Vec<Type>>()
+                .get(index.eval(scope)?.get_number() as usize)?
+                .clone(),
         })
     }
 }

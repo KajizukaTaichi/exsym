@@ -141,14 +141,14 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                 "filter" => |args, scope| {
                     let mut result = vec![];
                     for (data, target) in args
-                        .get(0)?
+                        .get(1)?
                         .eval(scope)?
                         .get_array()
                         .iter()
                         .zip(args.get(2)?.eval(scope)?.get_array())
                     {
                         if data.eval(scope)?.display(scope)
-                            == args.get(1)?.eval(scope)?.display(scope)
+                            == args.get(0)?.eval(scope)?.display(scope)
                         {
                             result.push(target);
                         }

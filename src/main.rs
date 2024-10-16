@@ -138,6 +138,23 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                         args.get(0)?.eval(scope)?.get_array().len() as f64
                     ))
                 },
+                "filter" => |args, scope| {
+                    let mut result = vec![];
+                    for (data, target) in args
+                        .get(0)?
+                        .eval(scope)?
+                        .get_array()
+                        .iter()
+                        .zip(args.get(2)?.eval(scope)?.get_array())
+                    {
+                        if data.eval(scope)?.display(scope)
+                            == args.get(1)?.eval(scope)?.display(scope)
+                        {
+                            result.push(target);
+                        }
+                    }
+                    Some(Type::Array(result))
+                },
                 "range" => |args, scope| {
                     Some(Type::Array(
                         (args.get(0)?.eval(scope)?.get_number() as usize

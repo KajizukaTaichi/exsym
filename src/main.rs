@@ -51,15 +51,20 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
             if define.contains('[') && define.trim().ends_with(']') {
                 define.remove(define.len() - 1);
                 let (target, index) = define.split_once("[").unwrap();
-
                 let mut array = scope.clone().get(target)?.eval(scope)?.get_array();
+                let index = parse_expr(index.to_string())?.eval(scope)?.get_number() as usize;
+                let value = if is_recalc {
+                    parse_expr(line[1].to_string())?
+                } else {
+                    Expr::Value(parse_expr(line[1].to_string())?.eval(scope)?)
+                };
 
-                array[parse_expr(index.to_string())?.eval(scope)?.get_number() as usize] =
-                    if is_recalc {
-                        parse_expr(line[1].to_string())?
-                    } else {
-                        Expr::Value(parse_expr(line[1].to_string())?.eval(scope)?)
-                    };
+                if array.len() < index {
+                    array.push(value);
+                } else {
+                    array[index] = value;
+                }
+
                 result = Type::Array(array);
                 scope.insert(target.to_string(), Expr::Value(result.clone()));
             } else {

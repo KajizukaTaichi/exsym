@@ -1,5 +1,5 @@
 use rustyline::DefaultEditor;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const VERSION: &str = "0.1.0";
 
@@ -19,8 +19,19 @@ fn main() {
                 } else {
                     println!("Symbols {{");
                     let width = scope.keys().map(|s| s.len()).max().unwrap_or(0);
-                    for (name, value) in scope.clone() {
-                        println!(" {:>width$}: {:?}", name, value,);
+                    let mut names = scope
+                        .keys()
+                        .cloned()
+                        .collect::<HashSet<String>>()
+                        .iter()
+                        .cloned()
+                        .collect::<Vec<String>>();
+                    names.sort();
+                    for name in names {
+                        let value = scope[&name].clone();
+                        if let Some(result) = value.eval(&mut scope) {
+                            println!(" {:>width$}: {}", name, result.display(&mut scope));
+                        }
                     }
                     println!("}}");
                 }

@@ -59,7 +59,7 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
                     Expr::Value(parse_expr(line[1].to_string())?.eval(scope)?)
                 };
 
-                if array.len() < index {
+                if array.len() <= index {
                     array.push(value);
                 } else {
                     array[index] = value;

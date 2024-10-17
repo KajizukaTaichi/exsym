@@ -100,6 +100,13 @@ fn parse_expr(soruce: String) -> Option<Expr> {
     let left = tokens.last()?.trim().to_string();
     let left = if let Ok(n) = left.parse::<f64>() {
         Expr::Value(Type::Number(n))
+    } else if left.starts_with("!") {
+        let mut left = left.clone();
+        left.remove(0);
+        Expr::Prefix(Box::new(Prefix {
+            operator: Operator::Not,
+            values: parse_expr(left.to_string())?,
+        }))
     } else if left.starts_with('"') && left.ends_with('"') {
         let left = {
             let mut left = left.clone();
@@ -525,6 +532,7 @@ impl Type {
 #[derive(Debug, Clone)]
 enum Expr {
     Infix(Box<Infix>),
+    Prefix(Box<Prefix>),
     Function(
         fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>,
         Vec<Expr>,
@@ -536,6 +544,7 @@ enum Expr {
 impl Expr {
     fn eval(&self, scope: &mut HashMap<String, Expr>) -> Option<Type> {
         Some(match self {
+            Expr::Prefix(prefix) => (*prefix).eval(scope)?,
             Expr::Infix(infix) => (*infix).eval(scope)?,
             Expr::Value(value) => {
                 if let Type::Symbol(name) = value {
@@ -568,6 +577,12 @@ struct Infix {
 }
 
 #[derive(Debug, Clone)]
+struct Prefix {
+    operator: Operator,
+    values: Expr,
+}
+
+#[derive(Debug, Clone)]
 enum Operator {
     Add,
     Sub,
@@ -579,6 +594,7 @@ enum Operator {
     GreaterThan,
     And,
     Or,
+    Not,
     Concat,
 }
 
@@ -598,6 +614,17 @@ impl Infix {
             Operator::And => Type::Bool(left.get_bool() && right.get_bool()),
             Operator::Or => Type::Bool(left.get_bool() || right.get_bool()),
             Operator::Concat => Type::String(left.get_string() + &right.get_string()),
+            _ => todo!(),
+        })
+    }
+}
+
+impl Prefix {
+    fn eval(&self, scope: &mut HashMap<String, Expr>) -> Option<Type> {
+        let value = self.values.eval(scope)?;
+        Some(match self.operator {
+            Operator::Not => Type::Bool(!value.get_bool()),
+            _ => todo!(),
         })
     }
 }

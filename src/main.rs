@@ -1,3 +1,4 @@
+use regex::Regex;
 use rustyline::DefaultEditor;
 use std::collections::{HashMap, HashSet};
 
@@ -161,10 +162,12 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                         .iter()
                         .zip(args.get(2)?.eval(scope)?.get_array())
                     {
-                        if data.eval(scope)?.display(scope)
-                            == args.get(0)?.eval(scope)?.display(scope)
+                        if let Ok(regex) =
+                            Regex::new(&format!("^{}$", &args.get(0)?.eval(scope)?.get_string()))
                         {
-                            result.push(target);
+                            if regex.is_match(&data.eval(scope)?.get_string()) {
+                                result.push(target);
+                            }
                         }
                     }
                     Some(Type::Array(result))

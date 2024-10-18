@@ -257,6 +257,7 @@ fn parse_expr(soruce: String) -> Option<Expr> {
             "<" => Operator::LessThan,
             ">" => Operator::GreaterThan,
             "++" => Operator::Concat,
+            "+++" => Operator::ConcatArray,
             "&" => Operator::And,
             "|" => Operator::Or,
             _ => return None,
@@ -613,6 +614,7 @@ enum Operator {
     Or,
     Not,
     Concat,
+    ConcatArray,
 }
 
 impl Infix {
@@ -631,6 +633,7 @@ impl Infix {
             Operator::And => Type::Bool(left.get_bool() && right.get_bool()),
             Operator::Or => Type::Bool(left.get_bool() || right.get_bool()),
             Operator::Concat => Type::String(left.get_string() + &right.get_string()),
+            Operator::ConcatArray => Type::Array([left.get_array(), right.get_array()].concat()),
             _ => todo!(),
         })
     }

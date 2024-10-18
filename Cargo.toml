@@ -1,5 +1,7 @@
 [package]
 name = "exsym"
+description = "Symbolic computing system for business"
+license = "MIT"
 version = "0.1.0"
 edition = "2021"
 

@@ -107,6 +107,13 @@ fn parse_expr(soruce: String) -> Option<Expr> {
             operator: Operator::Not,
             values: parse_expr(left.to_string())?,
         }))
+    } else if left.starts_with("-") {
+        let mut left = left.clone();
+        left.remove(0);
+        Expr::Prefix(Box::new(Prefix {
+            operator: Operator::Sub,
+            values: parse_expr(left.to_string())?,
+        }))
     } else if left.starts_with('"') && left.ends_with('"') {
         let left = {
             let mut left = left.clone();
@@ -633,6 +640,7 @@ impl Prefix {
     fn eval(&self, scope: &mut HashMap<String, Expr>) -> Option<Type> {
         let value = self.values.eval(scope)?;
         Some(match self.operator {
+            Operator::Sub => Type::Number(-value.get_number()),
             Operator::Not => Type::Bool(!value.get_bool()),
             _ => todo!(),
         })

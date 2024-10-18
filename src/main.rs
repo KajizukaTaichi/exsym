@@ -136,6 +136,14 @@ fn parse_expr(soruce: String) -> Option<Expr> {
                 .map(|x| parse_expr(x.trim().to_string()).unwrap())
                 .collect(),
         ))
+    } else if left.starts_with('{') && left.ends_with('}') {
+        let left = {
+            let mut left = left.clone();
+            left.remove(0);
+            left.remove(left.len() - 1);
+            left
+        };
+        Expr::Block(left)
     } else if left.contains('(') && left.ends_with(')') {
         let mut left = left.clone();
         left.remove(left.len() - 1);
@@ -268,7 +276,7 @@ fn tokenize_program(input: String) -> Vec<Vec<String>> {
 
     for c in input.chars() {
         match c {
-            '(' | '[' if !in_quote => {
+            '(' | '[' | '{' if !in_quote => {
                 if is_equal {
                     after_equal.push(c);
                 } else {
@@ -276,7 +284,7 @@ fn tokenize_program(input: String) -> Vec<Vec<String>> {
                 }
                 in_parentheses += 1;
             }
-            ')' | ']' if !in_quote => {
+            ')' | ']' | '}' if !in_quote => {
                 if is_equal {
                     after_equal.push(c);
                 } else {
@@ -352,11 +360,11 @@ fn tokenize_args(input: String) -> Option<Vec<String>> {
 
     for c in input.chars() {
         match c {
-            '(' | '[' if !in_quote => {
+            '(' | '[' | '{' if !in_quote => {
                 current_token.push(c);
                 in_parentheses += 1;
             }
-            ')' | ']' if !in_quote => {
+            ')' | ']' | '}' if !in_quote => {
                 current_token.push(c);
                 if in_parentheses > 0 {
                     in_parentheses -= 1;
@@ -408,11 +416,11 @@ fn tokenize_expr(input: String) -> Option<Vec<String>> {
 
     for c in input.chars() {
         match c {
-            '(' | '[' if !in_quote => {
+            '(' | '[' | '{' if !in_quote => {
                 current_token.push(c);
                 in_parentheses += 1;
             }
-            ')' | ']' if !in_quote => {
+            ')' | ']' | '}' if !in_quote => {
                 current_token.push(c);
                 if in_parentheses > 0 {
                     in_parentheses -= 1;
@@ -537,6 +545,7 @@ enum Expr {
         fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>,
         Vec<Expr>,
     ),
+    Block(String),
     Access(Box<Expr>, Box<Expr>),
     Value(Type),
 }
@@ -558,6 +567,7 @@ impl Expr {
                 }
             }
             Expr::Function(func, args) => func(args.to_owned(), scope)?,
+            Expr::Block(code) => run_program(code.to_string(), &mut scope.clone())?,
             Expr::Access(target, index) => target
                 .eval(scope)?
                 .get_array()

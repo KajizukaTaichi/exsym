@@ -89,6 +89,33 @@ fn main() {
                     .eval(scope)
             })),
         ),
+        (
+            "split".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                Some(Type::Array(
+                    args.get(0)?
+                        .eval(scope)?
+                        .get_string()
+                        .split(&args.get(1)?.eval(scope)?.get_string())
+                        .map(|x| Expr::Value(Type::String(x.to_string())))
+                        .collect(),
+                ))
+            })),
+        ),
+        (
+            "join".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                Some(Type::String(
+                    args.get(0)?
+                        .eval(scope)?
+                        .get_array()
+                        .iter()
+                        .map(|x| x.eval(scope).unwrap().get_string())
+                        .collect::<Vec<String>>()
+                        .join(&args.get(1)?.eval(scope)?.get_string()),
+                ))
+            })),
+        ),
     ]);
 
     let mut rl = DefaultEditor::new().unwrap();

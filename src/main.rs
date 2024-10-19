@@ -6,7 +6,90 @@ const VERSION: &str = "0.1.0";
 
 fn main() {
     println!("Exsym {VERSION}");
-    let mut scope: HashMap<String, Expr> = HashMap::new();
+    let mut scope: HashMap<String, Expr> = HashMap::from([
+        (
+            "sum".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                args.get(0)?
+                    .eval(scope)?
+                    .get_array()
+                    .iter()
+                    .cloned()
+                    .reduce(|a, c| {
+                        let binding = a.eval(scope).unwrap().get_number()
+                            + c.eval(scope).unwrap().get_number();
+                        Expr::Value(Type::Number(binding))
+                    })?
+                    .eval(scope)
+            })),
+        ),
+        (
+            "count".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                Some(Type::Number(
+                    args.get(0)?.eval(scope)?.get_array().len() as f64
+                ))
+            })),
+        ),
+        (
+            "filter".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                let mut result = vec![];
+                for (data, target) in args
+                    .get(1)?
+                    .eval(scope)?
+                    .get_array()
+                    .iter()
+                    .zip(args.get(2)?.eval(scope)?.get_array())
+                {
+                    if let Ok(regex) =
+                        Regex::new(&format!("^{}$", &args.get(0)?.eval(scope)?.get_string()))
+                    {
+                        if regex.is_match(&data.eval(scope)?.get_string()) {
+                            result.push(target);
+                        }
+                    }
+                }
+                Some(Type::Array(result))
+            })),
+        ),
+        (
+            "range".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                Some(Type::Array(
+                    (args.get(0)?.eval(scope)?.get_number() as usize
+                        ..args.get(1)?.eval(scope)?.get_number() as usize)
+                        .step_by(args.get(2)?.eval(scope)?.get_number() as usize)
+                        .map(|x| Expr::Value(Type::Number(x as f64)))
+                        .collect(),
+                ))
+            })),
+        ),
+        (
+            "if".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                if args.get(0)?.eval(scope)?.get_bool() {
+                    args.get(1)?.eval(scope)
+                } else {
+                    args.get(2)?.eval(scope)
+                }
+            })),
+        ),
+        (
+            "lookup".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                let index = args.get(1)?.eval(scope)?.get_array().iter().position(|x| {
+                    x.eval(scope).unwrap().display(scope)
+                        == args.get(0).unwrap().eval(scope).unwrap().display(scope)
+                })?;
+                args.get(2)?
+                    .eval(scope)?
+                    .get_array()
+                    .get(index)?
+                    .eval(scope)
+            })),
+        ),
+    ]);
 
     let mut rl = DefaultEditor::new().unwrap();
     loop {
@@ -64,11 +147,13 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
                 define.remove(define.len() - 1);
                 let (target, index) = define.split_once("[").unwrap();
                 let mut array = scope.clone().get(target)?.eval(scope)?.get_array();
-                let index = parse_expr(index.to_string())?.eval(scope)?.get_number() as usize;
+                let index = parse_expr(index.to_string(), scope)?
+                    .eval(scope)?
+                    .get_number() as usize;
                 let value = if is_recalc {
-                    parse_expr(line[1].to_string())?
+                    parse_expr(line[1].to_string(), scope)?
                 } else {
-                    Expr::Value(parse_expr(line[1].to_string())?.eval(scope)?)
+                    Expr::Value(parse_expr(line[1].to_string(), scope)?.eval(scope)?)
                 };
 
                 if array.len() <= index {
@@ -80,21 +165,22 @@ fn run_program(source: String, scope: &mut HashMap<String, Expr>) -> Option<Type
                 result = Type::Array(array);
                 scope.insert(target.to_string(), Expr::Value(result.clone()));
             } else {
-                result = parse_expr(line[1].clone())?.eval(scope)?;
+                result = parse_expr(line[1].clone(), scope)?.eval(scope)?;
                 if is_recalc {
-                    scope.insert(define, parse_expr(line[1].clone())?);
+                    let value = parse_expr(line[1].clone(), scope)?;
+                    scope.insert(define, value);
                 } else {
                     scope.insert(define, Expr::Value(result.clone()));
                 }
             }
         } else {
-            result = parse_expr(line[0].clone())?.eval(scope)?;
+            result = parse_expr(line[0].clone(), scope)?.eval(scope)?;
         }
     }
     Some(result)
 }
 
-fn parse_expr(soruce: String) -> Option<Expr> {
+fn parse_expr(soruce: String, scope: &mut HashMap<String, Expr>) -> Option<Expr> {
     let tokens: Vec<String> = tokenize_expr(soruce)?;
 
     let left = tokens.last()?.trim().to_string();
@@ -105,14 +191,14 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         left.remove(0);
         Expr::Prefix(Box::new(Prefix {
             operator: Operator::Not,
-            values: parse_expr(left.to_string())?,
+            values: parse_expr(left.to_string(), scope)?,
         }))
     } else if left.starts_with("-") {
         let mut left = left.clone();
         left.remove(0);
         Expr::Prefix(Box::new(Prefix {
             operator: Operator::Sub,
-            values: parse_expr(left.to_string())?,
+            values: parse_expr(left.to_string(), scope)?,
         }))
     } else if left.starts_with('"') && left.ends_with('"') {
         let left = {
@@ -129,7 +215,7 @@ fn parse_expr(soruce: String) -> Option<Expr> {
             left.remove(left.len() - 1);
             left
         };
-        parse_expr(left)?
+        parse_expr(left, scope)?
     } else if left.starts_with('[') && left.ends_with(']') {
         let left = {
             let mut left = left.clone();
@@ -140,7 +226,7 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         Expr::Value(Type::Array(
             tokenize_args(left)?
                 .iter()
-                .map(|x| parse_expr(x.trim().to_string()).unwrap())
+                .map(|x| parse_expr(x.trim().to_string(), scope).unwrap())
                 .collect(),
         ))
     } else if left.starts_with('{') && left.ends_with('}') {
@@ -156,76 +242,14 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         left.remove(left.len() - 1);
         let (func, args) = left.split_once("(").unwrap();
         Expr::Function(
-            match func {
-                "sum" => |args, scope| {
-                    args.get(0)?
-                        .eval(scope)?
-                        .get_array()
-                        .iter()
-                        .cloned()
-                        .reduce(|a, c| {
-                            let binding = a.eval(scope).unwrap().get_number()
-                                + c.eval(scope).unwrap().get_number();
-                            Expr::Value(Type::Number(binding))
-                        })?
-                        .eval(scope)
-                },
-                "count" => |args, scope| {
-                    Some(Type::Number(
-                        args.get(0)?.eval(scope)?.get_array().len() as f64
-                    ))
-                },
-                "filter" => |args, scope| {
-                    let mut result = vec![];
-                    for (data, target) in args
-                        .get(1)?
-                        .eval(scope)?
-                        .get_array()
-                        .iter()
-                        .zip(args.get(2)?.eval(scope)?.get_array())
-                    {
-                        if let Ok(regex) =
-                            Regex::new(&format!("^{}$", &args.get(0)?.eval(scope)?.get_string()))
-                        {
-                            if regex.is_match(&data.eval(scope)?.get_string()) {
-                                result.push(target);
-                            }
-                        }
-                    }
-                    Some(Type::Array(result))
-                },
-                "range" => |args, scope| {
-                    Some(Type::Array(
-                        (args.get(0)?.eval(scope)?.get_number() as usize
-                            ..args.get(1)?.eval(scope)?.get_number() as usize)
-                            .step_by(args.get(2)?.eval(scope)?.get_number() as usize)
-                            .map(|x| Expr::Value(Type::Number(x as f64)))
-                            .collect(),
-                    ))
-                },
-                "if" => |args, scope| {
-                    if args.get(0)?.eval(scope)?.get_bool() {
-                        args.get(1)?.eval(scope)
-                    } else {
-                        args.get(2)?.eval(scope)
-                    }
-                },
-                "lookup" => |args, scope| {
-                    let index = args.get(1)?.eval(scope)?.get_array().iter().position(|x| {
-                        x.eval(scope).unwrap().display(scope)
-                            == args.get(0).unwrap().eval(scope).unwrap().display(scope)
-                    })?;
-                    args.get(2)?
-                        .eval(scope)?
-                        .get_array()
-                        .get(index)?
-                        .eval(scope)
-                },
-                _ => |args, scope| args.get(0)?.eval(scope),
+            if let Type::Function(f) = parse_expr(func.to_string(), scope)?.eval(scope)? {
+                f
+            } else {
+                return None;
             },
             tokenize_args(args.to_string())?
                 .iter()
-                .map(|x| parse_expr(x.to_owned()).unwrap())
+                .map(|x| parse_expr(x.to_owned(), scope).unwrap())
                 .collect::<Vec<Expr>>(),
         )
     } else if left.contains('[') && left.ends_with(']') {
@@ -233,8 +257,8 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         left.remove(left.len() - 1);
         let (target, index) = left.split_once("[").unwrap();
         Expr::Access(
-            Box::new(parse_expr(target.to_string())?),
-            Box::new(parse_expr(index.to_string())?),
+            Box::new(parse_expr(target.to_string(), scope)?),
+            Box::new(parse_expr(index.to_string(), scope)?),
         )
     } else {
         Expr::Value(Type::Symbol(left))
@@ -266,7 +290,7 @@ fn parse_expr(soruce: String) -> Option<Expr> {
         Some(Expr::Infix(Box::new(Infix {
             operator,
             values: (
-                parse_expr(tokens.get(..tokens.len() - 2)?.to_vec().join(" "))?,
+                parse_expr(tokens.get(..tokens.len() - 2)?.to_vec().join(" "), scope)?,
                 left,
             ),
         })))
@@ -479,6 +503,7 @@ enum Type {
     Bool(bool),
     String(String),
     Array(Vec<Expr>),
+    Function(Function),
     Symbol(String),
     Null,
 }
@@ -531,6 +556,7 @@ impl Type {
                     .join(", ")
             ),
             Type::Null => "null".to_string(),
+            Type::Function(f) => format!("function({f:?})"),
         }
     }
 
@@ -550,14 +576,13 @@ impl Type {
 enum Expr {
     Infix(Box<Infix>),
     Prefix(Box<Prefix>),
-    Function(
-        fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>,
-        Vec<Expr>,
-    ),
+    Function(Function, Vec<Expr>),
     Block(String),
     Access(Box<Expr>, Box<Expr>),
     Value(Type),
 }
+
+type Function = fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>;
 
 impl Expr {
     fn eval(&self, scope: &mut HashMap<String, Expr>) -> Option<Type> {

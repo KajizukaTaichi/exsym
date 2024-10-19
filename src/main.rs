@@ -64,6 +64,26 @@ fn main() {
             })),
         ),
         (
+            "average".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                Some(Type::Number(
+                    args.get(0)?
+                        .eval(scope)?
+                        .get_array()
+                        .iter()
+                        .cloned()
+                        .reduce(|a, c| {
+                            let binding = a.eval(scope).unwrap().get_number()
+                                + c.eval(scope).unwrap().get_number();
+                            Expr::Value(Type::Number(binding))
+                        })?
+                        .eval(scope)?
+                        .get_number()
+                        / args.get(0)?.eval(scope)?.get_array().len() as f64,
+                ))
+            })),
+        ),
+        (
             "count".to_string(),
             Expr::Value(Type::Function(|args, scope| {
                 Some(Type::Number(

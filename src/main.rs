@@ -24,6 +24,46 @@ fn main() {
             })),
         ),
         (
+            "max".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                args.get(0)?
+                    .eval(scope)?
+                    .get_array()
+                    .iter()
+                    .cloned()
+                    .reduce(|a, c| {
+                        let a = a.eval(scope).unwrap().get_number();
+                        let c = c.eval(scope).unwrap().get_number();
+                        if a > c {
+                            Expr::Value(Type::Number(a))
+                        } else {
+                            Expr::Value(Type::Number(c))
+                        }
+                    })?
+                    .eval(scope)
+            })),
+        ),
+        (
+            "min".to_string(),
+            Expr::Value(Type::Function(|args, scope| {
+                args.get(0)?
+                    .eval(scope)?
+                    .get_array()
+                    .iter()
+                    .cloned()
+                    .reduce(|a, c| {
+                        let a = a.eval(scope).unwrap().get_number();
+                        let c = c.eval(scope).unwrap().get_number();
+                        if a < c {
+                            Expr::Value(Type::Number(a))
+                        } else {
+                            Expr::Value(Type::Number(c))
+                        }
+                    })?
+                    .eval(scope)
+            })),
+        ),
+        (
             "count".to_string(),
             Expr::Value(Type::Function(|args, scope| {
                 Some(Type::Number(

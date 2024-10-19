@@ -308,8 +308,6 @@ fn parse_expr(soruce: String, scope: &mut HashMap<String, Expr>) -> Option<Expr>
             "==" => Operator::Equal,
             "<" => Operator::LessThan,
             ">" => Operator::GreaterThan,
-            "++" => Operator::Concat,
-            "+++" => Operator::ConcatArray,
             "&" => Operator::And,
             "|" => Operator::Or,
             _ => return None,
@@ -667,8 +665,6 @@ enum Operator {
     And,
     Or,
     Not,
-    Concat,
-    ConcatArray,
 }
 
 impl Infix {
@@ -676,9 +672,35 @@ impl Infix {
         let left = self.values.0.eval(scope)?;
         let right = self.values.1.eval(scope)?;
         Some(match self.operator {
-            Operator::Add => Type::Number(left.get_number() + right.get_number()),
-            Operator::Sub => Type::Number(left.get_number() - right.get_number()),
-            Operator::Mul => Type::Number(left.get_number() * right.get_number()),
+            Operator::Add => {
+                if let Type::Number(left) = left {
+                    Type::Number(left + right.get_number())
+                } else if let Type::String(left) = left {
+                    Type::String(left + &right.get_string())
+                } else if let Type::Array(left) = left {
+                    Type::Array([left, right.get_array()].concat())
+                } else {
+                    Type::Null
+                }
+            }
+            Operator::Sub => {
+                if let Type::Number(left) = left {
+                    Type::Number(left - right.get_number())
+                } else if let Type::String(left) = left {
+                    Type::String(left.replace(&right.get_string(), ""))
+                } else {
+                    Type::Null
+                }
+            }
+            Operator::Mul => {
+                if let Type::Number(left) = left {
+                    Type::Number(left * right.get_number())
+                } else if let Type::String(left) = left {
+                    Type::String(left.repeat(right.get_number() as usize))
+                } else {
+                    Type::Null
+                }
+            }
             Operator::Div => Type::Number(left.get_number() / right.get_number()),
             Operator::Mod => Type::Number(left.get_number() % right.get_number()),
             Operator::Pow => Type::Number(left.get_number().powf(right.get_number())),
@@ -687,8 +709,6 @@ impl Infix {
             Operator::GreaterThan => Type::Bool(left.get_number() > right.get_number()),
             Operator::And => Type::Bool(left.get_bool() && right.get_bool()),
             Operator::Or => Type::Bool(left.get_bool() || right.get_bool()),
-            Operator::Concat => Type::String(left.get_string() + &right.get_string()),
-            Operator::ConcatArray => Type::Array([left.get_array(), right.get_array()].concat()),
             _ => todo!(),
         })
     }

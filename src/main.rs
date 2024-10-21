@@ -9,7 +9,7 @@ fn main() {
     let mut scope: HashMap<String, Expr> = HashMap::from([
         (
             "sum".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 args.get(0)?
                     .eval(scope)?
                     .get_array()
@@ -21,11 +21,11 @@ fn main() {
                         Expr::Value(Type::Number(binding))
                     })?
                     .eval(scope)
-            })),
+            }))),
         ),
         (
             "max".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 args.get(0)?
                     .eval(scope)?
                     .get_array()
@@ -41,11 +41,11 @@ fn main() {
                         }
                     })?
                     .eval(scope)
-            })),
+            }))),
         ),
         (
             "min".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 args.get(0)?
                     .eval(scope)?
                     .get_array()
@@ -61,11 +61,11 @@ fn main() {
                         }
                     })?
                     .eval(scope)
-            })),
+            }))),
         ),
         (
             "average".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Number(
                     args.get(0)?
                         .eval(scope)?
@@ -81,19 +81,19 @@ fn main() {
                         .get_number()
                         / args.get(0)?.eval(scope)?.get_array().len() as f64,
                 ))
-            })),
+            }))),
         ),
         (
             "count".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Number(
                     args.get(0)?.eval(scope)?.get_array().len() as f64
                 ))
-            })),
+            }))),
         ),
         (
             "filter".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 let mut result = vec![];
                 for (data, target) in args
                     .get(1)?
@@ -111,11 +111,11 @@ fn main() {
                     }
                 }
                 Some(Type::Array(result))
-            })),
+            }))),
         ),
         (
             "range".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Array(
                     (args.get(0)?.eval(scope)?.get_number() as usize
                         ..args.get(1)?.eval(scope)?.get_number() as usize)
@@ -123,21 +123,21 @@ fn main() {
                         .map(|x| Expr::Value(Type::Number(x as f64)))
                         .collect(),
                 ))
-            })),
+            }))),
         ),
         (
             "if".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 if args.get(0)?.eval(scope)?.get_bool() {
                     args.get(1)?.eval(scope)
                 } else {
                     args.get(2)?.eval(scope)
                 }
-            })),
+            }))),
         ),
         (
             "lookup".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 let index = args.get(1)?.eval(scope)?.get_array().iter().position(|x| {
                     x.eval(scope).unwrap().display(scope)
                         == args.get(0).unwrap().eval(scope).unwrap().display(scope)
@@ -147,11 +147,11 @@ fn main() {
                     .get_array()
                     .get(index)?
                     .eval(scope)
-            })),
+            }))),
         ),
         (
             "split".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Array(
                     args.get(0)?
                         .eval(scope)?
@@ -160,11 +160,11 @@ fn main() {
                         .map(|x| Expr::Value(Type::String(x.to_string())))
                         .collect(),
                 ))
-            })),
+            }))),
         ),
         (
             "join".to_string(),
-            Expr::Value(Type::Function(|args, scope| {
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::String(
                     args.get(0)?
                         .eval(scope)?
@@ -174,7 +174,7 @@ fn main() {
                         .collect::<Vec<String>>()
                         .join(&args.get(1)?.eval(scope)?.get_string()),
                 ))
-            })),
+            }))),
         ),
     ]);
 
@@ -303,6 +303,22 @@ fn parse_expr(soruce: String, scope: &mut HashMap<String, Expr>) -> Option<Expr>
             left
         };
         parse_expr(left, scope)?
+    } else if left.starts_with("function(") && left.ends_with('}') {
+        let left = {
+            let mut left = left.clone();
+            left = left.replacen("function(", "", 1);
+            left.remove(left.len() - 1);
+            left
+        };
+        let splited = left.split_once("){").unwrap();
+        let args = tokenize_args(splited.0.to_string())?
+            .iter()
+            .map(|x| x.trim().to_string())
+            .collect();
+        Expr::Value(Type::Function(Function::UserDefined(
+            args,
+            splited.1.to_string(),
+        )))
     } else if left.starts_with('[') && left.ends_with(']') {
         let left = {
             let mut left = left.clone();
@@ -667,7 +683,11 @@ enum Expr {
     Value(Type),
 }
 
-type Function = fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>;
+#[derive(Clone, Debug)]
+enum Function {
+    BuiltIn(fn(Vec<Expr>, &mut HashMap<String, Expr>) -> Option<Type>),
+    UserDefined(Vec<String>, String),
+}
 
 impl Expr {
     fn eval(&self, scope: &mut HashMap<String, Expr>) -> Option<Type> {
@@ -685,7 +705,14 @@ impl Expr {
                     value.clone()
                 }
             }
-            Expr::Function(func, args) => func(args.to_owned(), scope)?,
+            Expr::Function(Function::BuiltIn(func), args) => func(args.to_owned(), scope)?,
+            Expr::Function(Function::UserDefined(params, code), args) => {
+                let mut scope = scope.clone();
+                for i in params.iter().zip(args) {
+                    scope.insert(i.0.to_string(), i.1.clone());
+                }
+                run_program(code.to_string(), &mut scope)?
+            }
             Expr::Block(code) => run_program(code.to_string(), &mut scope.clone())?,
             Expr::Access(target, index) => target
                 .eval(scope)?

@@ -114,6 +114,23 @@ fn main() {
             }))),
         ),
         (
+            "map".to_string(),
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
+                let mut result = vec![];
+                let func = if let Type::Function(func) = args.get(1)?.eval(scope)? {
+                    func
+                } else {
+                    return None;
+                };
+                for target in args.get(0)?.eval(scope)?.get_array() {
+                    result.push(Expr::Value(
+                        Expr::Function(func.clone(), vec![target]).eval(scope)?,
+                    ));
+                }
+                Some(Type::Array(result))
+            }))),
+        ),
+        (
             "range".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Array(
@@ -658,7 +675,9 @@ impl Type {
             ),
             Type::Null => "null".to_string(),
             Type::Function(Function::BuiltIn(f)) => format!("function({f:?})"),
-            Type::Function(Function::UserDefined(args,code )) => format!("function({}){{{code}}}", args.join(", ")),
+            Type::Function(Function::UserDefined(args, code)) => {
+                format!("function({}){{{code}}}", args.join(", "))
+            }
         }
     }
 

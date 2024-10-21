@@ -8,19 +8,17 @@ fn main() {
     let mut scope: HashMap<String, Expr> = HashMap::from([
         (
             "sum".to_string(),
-            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
-                args.get(0)?
-                    .eval(scope)?
-                    .get_array()
-                    .iter()
-                    .cloned()
-                    .reduce(|a, c| {
-                        let binding = a.eval(scope).unwrap().get_number()
-                            + c.eval(scope).unwrap().get_number();
-                        Expr::Value(Type::Number(binding))
-                    })?
-                    .eval(scope)
-            }))),
+            Expr::Value(Type::Function(Function::UserDefined(
+                vec!["nums".to_string()],
+                "reduce(nums, 0, function(a, c){a + c})".to_string(),
+            ))),
+        ),
+        (
+            "average".to_string(),
+            Expr::Value(Type::Function(Function::UserDefined(
+                vec!["nums".to_string()],
+                "sum(nums) / len(nums)".to_string(),
+            ))),
         ),
         (
             "max".to_string(),
@@ -63,27 +61,7 @@ fn main() {
             }))),
         ),
         (
-            "average".to_string(),
-            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
-                Some(Type::Number(
-                    args.get(0)?
-                        .eval(scope)?
-                        .get_array()
-                        .iter()
-                        .cloned()
-                        .reduce(|a, c| {
-                            let binding = a.eval(scope).unwrap().get_number()
-                                + c.eval(scope).unwrap().get_number();
-                            Expr::Value(Type::Number(binding))
-                        })?
-                        .eval(scope)?
-                        .get_number()
-                        / args.get(0)?.eval(scope)?.get_array().len() as f64,
-                ))
-            }))),
-        ),
-        (
-            "count".to_string(),
+            "len".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Number(
                     args.get(0)?.eval(scope)?.get_array().len() as f64
@@ -147,11 +125,9 @@ fn main() {
             "if".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 if args.get(0)?.eval(scope)?.get_bool() {
-                    let func = args.get(1)?.eval(scope)?.get_function();
-                    Expr::Function(func, vec![]).eval(scope)
+                    args.get(1)?.eval(scope)
                 } else {
-                    let func = args.get(2)?.eval(scope)?.get_function();
-                    Expr::Function(func, vec![]).eval(scope)
+                    args.get(2)?.eval(scope)
                 }
             }))),
         ),

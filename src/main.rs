@@ -1,4 +1,3 @@
-use regex::Regex;
 use rustyline::DefaultEditor;
 use std::collections::{HashMap, HashSet};
 
@@ -95,19 +94,13 @@ fn main() {
             "filter".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 let mut result = vec![];
-                for (data, target) in args
-                    .get(1)?
-                    .eval(scope)?
-                    .get_array()
-                    .iter()
-                    .zip(args.get(2)?.eval(scope)?.get_array())
-                {
-                    if let Ok(regex) =
-                        Regex::new(&format!("^{}$", &args.get(0)?.eval(scope)?.get_string()))
+                let func = args.get(1)?.eval(scope)?.get_function();
+                for target in args.get(0)?.eval(scope)?.get_array() {
+                    if Expr::Function(func.clone(), vec![target.clone()])
+                        .eval(scope)?
+                        .get_bool()
                     {
-                        if regex.is_match(&data.eval(scope)?.get_string()) {
-                            result.push(target);
-                        }
+                        result.push(target);
                     }
                 }
                 Some(Type::Array(result))
@@ -117,11 +110,7 @@ fn main() {
             "map".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 let mut result = vec![];
-                let func = if let Type::Function(func) = args.get(1)?.eval(scope)? {
-                    func
-                } else {
-                    return None;
-                };
+                let func = args.get(1)?.eval(scope)?.get_function();
                 for target in args.get(0)?.eval(scope)?.get_array() {
                     result.push(Expr::Value(
                         Expr::Function(func.clone(), vec![target]).eval(scope)?,
@@ -146,24 +135,12 @@ fn main() {
             "if".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 if args.get(0)?.eval(scope)?.get_bool() {
-                    args.get(1)?.eval(scope)
+                    let func = args.get(1)?.eval(scope)?.get_function();
+                    Expr::Function(func, vec![]).eval(scope)
                 } else {
-                    args.get(2)?.eval(scope)
+                    let func = args.get(2)?.eval(scope)?.get_function();
+                    Expr::Function(func, vec![]).eval(scope)
                 }
-            }))),
-        ),
-        (
-            "lookup".to_string(),
-            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
-                let index = args.get(1)?.eval(scope)?.get_array().iter().position(|x| {
-                    x.eval(scope).unwrap().display(scope)
-                        == args.get(0).unwrap().eval(scope).unwrap().display(scope)
-                })?;
-                args.get(2)?
-                    .eval(scope)?
-                    .get_array()
-                    .get(index)?
-                    .eval(scope)
             }))),
         ),
         (
@@ -689,6 +666,12 @@ impl Type {
                 .map(|x| Expr::Value(Type::String(x.to_string())))
                 .collect(),
             other => vec![Expr::Value(other.to_owned())],
+        }
+    }
+    fn get_function(&self) -> Function {
+        match self {
+            Type::Function(func) => func.clone(),
+            _ => Function::UserDefined(vec![], "".to_string()),
         }
     }
 }

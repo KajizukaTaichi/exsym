@@ -120,6 +120,18 @@ fn main() {
             }))),
         ),
         (
+            "reduce".to_string(),
+            Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
+                let mut result = args.get(1)?.eval(scope)?;
+                let func = args.get(2)?.eval(scope)?.get_function();
+                for target in args.get(0)?.eval(scope)?.get_array() {
+                    result = Expr::Function(func.clone(), vec![target, Expr::Value(result)])
+                        .eval(scope)?;
+                }
+                Some(result)
+            }))),
+        ),
+        (
             "range".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 Some(Type::Array(

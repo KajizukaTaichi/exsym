@@ -657,7 +657,8 @@ impl Type {
                     .join(", ")
             ),
             Type::Null => "null".to_string(),
-            Type::Function(f) => format!("function({f:?})"),
+            Type::Function(Function::BuiltIn(f)) => format!("function({f:?})"),
+            Type::Function(Function::UserDefined(args,code )) => format!("function({}){{{code}}}", args.join(", ")),
         }
     }
 

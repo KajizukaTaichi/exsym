@@ -125,9 +125,9 @@ fn main() {
             "if".to_string(),
             Expr::Value(Type::Function(Function::BuiltIn(|args, scope| {
                 if args.get(0)?.eval(scope)?.get_bool() {
-                    args.get(1)?.eval(scope)
+                    run_program(args.get(1)?.eval(scope)?.get_string(), scope)
                 } else {
-                    args.get(2)?.eval(scope)
+                    run_program(args.get(2)?.eval(scope)?.get_string(), scope)
                 }
             }))),
         ),
@@ -322,6 +322,14 @@ fn parse_expr(soruce: String, scope: &mut HashMap<String, Expr>) -> Option<Expr>
             left
         };
         Expr::Block(left)
+    } else if left.starts_with("@{") && left.ends_with('}') {
+        let left = {
+            let mut left = left.clone();
+            left = left.replacen("@{", "", 1);
+            left.remove(left.len() - 1);
+            left
+        };
+        Expr::Value(Type::Block(left))
     } else if left.contains('(') && left.ends_with(')') {
         let mut left = left.clone();
         left.remove(left.len() - 1);
@@ -587,6 +595,7 @@ enum Type {
     String(String),
     Array(Vec<Expr>),
     Function(Function),
+    Block(String),
     Symbol(String),
     Null,
 }
@@ -618,13 +627,28 @@ impl Type {
 
     fn get_string(&self) -> String {
         match self {
-            Type::String(s) | Type::Symbol(s) => s.to_string(),
+            Type::String(s) | Type::Symbol(s) | Type::Block(s) => s.to_string(),
             Type::Number(n) => n.to_string(),
             Type::Bool(b) => b.to_string(),
             _ => String::new(),
         }
     }
-
+    fn get_array(&self) -> Vec<Expr> {
+        match self {
+            Type::Array(s) => s.to_owned(),
+            Type::String(s) => s
+                .chars()
+                .map(|x| Expr::Value(Type::String(x.to_string())))
+                .collect(),
+            other => vec![Expr::Value(other.to_owned())],
+        }
+    }
+    fn get_function(&self) -> Function {
+        match self {
+            Type::Function(func) => func.clone(),
+            _ => Function::UserDefined(vec![], "".to_string()),
+        }
+    }
     fn display(&self, scope: &mut HashMap<String, Expr>) -> String {
         match self {
             Type::String(s) => format!("\"{}\"", s),
@@ -643,23 +667,7 @@ impl Type {
             Type::Function(Function::UserDefined(args, code)) => {
                 format!("function({}){{{code}}}", args.join(", "))
             }
-        }
-    }
-
-    fn get_array(&self) -> Vec<Expr> {
-        match self {
-            Type::Array(s) => s.to_owned(),
-            Type::String(s) => s
-                .chars()
-                .map(|x| Expr::Value(Type::String(x.to_string())))
-                .collect(),
-            other => vec![Expr::Value(other.to_owned())],
-        }
-    }
-    fn get_function(&self) -> Function {
-        match self {
-            Type::Function(func) => func.clone(),
-            _ => Function::UserDefined(vec![], "".to_string()),
+            Type::Block(block) => format!("@{{{block}}}"),
         }
     }
 }
